@@ -68,4 +68,3 @@ void  TIM6_DAC_IRQHandler(void)
 		TIM_ClearITPendingBit(TIM6 , TIM_IT_Update);  		 
 	}		 	
 }
-/******************* (C) ∞Ê»® 2018 XTARK **************************************/
