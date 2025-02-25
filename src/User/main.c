@@ -16,19 +16,16 @@
 
 #include "ax_sys.h"    //系统设置
 #include "ax_delay.h"  //软件延时
-
 #include "ax_led.h"  //LED灯控制
 #include "ax_key.h"  //按键检测
 #include "ax_vin.h"  //输入电压检测
 #include "ax_flash.h"  //片上FLASH模拟EEPROM存储
-
 #include "ax_uart_db.h"  //调试串口，USB串口
 #include "ax_can.h"  //CAN通信
-
 #include "ax_motor.h"  //直流电机控制
 #include "ax_encoder.h" //编码器控制
 #include "ax_servo.h" //舵机控制
-
+#include "ax_ps2.h" //PS控制
 
 /******************************************************************************
       基础例程  清单
@@ -52,7 +49,7 @@
 int main(void)
 {
 	uint8_t i=0;
-	
+	uint8_t temp;
 	//设置中断优先级分组
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);    
 
@@ -68,161 +65,91 @@ int main(void)
 	AX_UART_DB_Init(115200); //调试串口
 	printf("  \r\n"); //输出空格，CPUBUG
 	
+	//VIN检测初始化
+	
+	AX_VIN_Init();
+	AX_KEY_Init();
+	AX_MOTOR_Init(10);  //设置电机控制PWM频率为10K
 	//LED点亮0.5S
 	AX_LED_Green_On();  
 	AX_Delayms(500);
 	AX_LED_Green_Off();
 	AX_Delayms(500);
+
+
+	//初始化
+	AX_SERVO_AB_Init();
+	AX_SERVO_CD_Init();
+	AX_SERVO_EFGH_Init();
+
 	
 	while (1)
 	{	
     //调试串口输出信息		
 		printf("Printf输出测试：%d \r\n",i);
 		i++;
+		temp = AX_KEY_Scan();
+		//按键按下后，LED灯闪烁一次
+		if (temp == 1)
+		{
+			AX_LED_Green_On();
+			AX_Delayms(100);
+			AX_LED_Green_Off();
+		}
+		AX_Delayms(10);
+		//每100MS输出一次电池电压值
+		printf("*采集VIN输入口电压值\r\n");
+		//VIN输入电压检测
+		vol = AX_VIN_GetVol_X100();
+		printf("*VIN电压：%d(0.01V)\r\n", vol);
+		AX_Delayms(100);
 		AX_Delayms(200);
 		
 		//LED反转
 	    AX_LED_Green_Toggle();
 		AX_LED_Red_Toggle();
+
+
+		//控制电机转动
+		for (temp = 0; temp <= 2000; temp++)
+		{
+			AX_MOTOR_A_SetSpeed(temp);
+			AX_MOTOR_B_SetSpeed(temp);
+			AX_Delayms(5);
+		}
+		AX_MOTOR_A_SetSpeed(0);
+		AX_MOTOR_B_SetSpeed(0);
+		AX_Delayms(1000);
+
+		//控制电机反向转动
+		for (temp = 0; temp <= 2000; temp++)
+		{
+			AX_MOTOR_A_SetSpeed(-temp);
+			AX_MOTOR_B_SetSpeed(-temp);
+			AX_Delayms(5);
+		}
+		AX_MOTOR_A_SetSpeed(0);
+		AX_MOTOR_B_SetSpeed(0);
+
+		printf("3路舵机控制测试\r\n");
+		printf("*30度...... \r\n");
+		AX_SERVO_A_SetAngle(300);
+		AX_SERVO_B_SetAngle(300);
+		AX_SERVO_C_SetAngle(300);
+		AX_Delayms(1000);
+
+		printf("*90度...... \r\n");
+		AX_SERVO_A_SetAngle(900);
+		AX_SERVO_B_SetAngle(900);
+		AX_SERVO_C_SetAngle(900);
+		AX_Delayms(1000);
+
+		printf("*150度...... \r\n");
+		AX_SERVO_A_SetAngle(1500);
+		AX_SERVO_B_SetAngle(1500);
+		AX_SERVO_C_SetAngle(1500);
 	}
 }
-
-
-
-///******************************************************************************
-//例程名称：VIN输入电压检测
-//例程说明：串口循环输出采集到的电压值
-//*******************************************************************************/
-//int main(void)
-//{
-//	uint16_t vol;
-//	
-//	//设置中断优先级分组
-//	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);    
-
-//	//JTAG口设置
-//	AX_JTAG_Set(JTAG_SWD_DISABLE);  //关闭JTAG接口 
-//	AX_JTAG_Set(SWD_ENABLE);  //打开SWD接口 可以利用主板的SWD接口调试 
-//	
-//	//软件延时初始化
-//	AX_DELAY_Init(); 	
-//	
-//	//调试串口初始化
-//	AX_UART_DB_Init(115200); //调试串口
-//	printf("  \r\n"); //输出空格，CPUBUG
-//	
-//	//VIN检测初始化
-//	AX_VIN_Init();
-//	
-//	//提示信息
-//	printf("*循环采集VIN输入口电压值\r\n");
-//	
-//	while (1) 
-//	{	
-//		//每100MS输出一次电池电压值
-//		vol = AX_VIN_GetVol_X100();
-//		printf("*VIN电压：%d(0.01V)\r\n",vol );	
-//		AX_Delayms(100);
-//	}
-//}
-
-
-
-///******************************************************************************
-//例程名称：KEY按键检测检测
-//例程说明：按键按下后，LED灯闪烁一次
-//*******************************************************************************/
-//int main(void)
-//{
-//	uint8_t temp;
-//	
-//	//设置中断优先级分组
-//	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);    
-
-//	//JTAG口设置
-//	AX_JTAG_Set(JTAG_SWD_DISABLE);  //关闭JTAG接口 
-//	AX_JTAG_Set(SWD_ENABLE);  //打开SWD接口 可以利用主板的SWD接口调试 
-//	
-//	//软件延时初始化
-//	AX_DELAY_Init(); 	
-//	AX_LED_Init();  	
-//	
-//	//调试串口初始化
-//	AX_UART_DB_Init(115200); //调试串口
-//	printf("  \r\n"); //输出空格，CPUBUG
-//	
-//	//初始化
-//	AX_KEY_Init();
-//	
-//	while (1) 
-//	{	
-//		temp = AX_KEY_Scan();
-//		
-//		if(temp == 1)
-//		{
-//			AX_LED_Green_On();  
-//			AX_Delayms(100);
-//			AX_LED_Green_Off();
-//		}
-//		AX_Delayms(10);
-//	}
-//}	
-
-
-
-///******************************************************************************
-//例程名称：直流电机PWM调速控制
-//例程说明：控制4路电机变速正传和变速反转交替运行
-//操作说明：电机可连接至四路控制接口中的任意一路，可以看到电机做间隔的增速正转和反转
-//*******************************************************************************/
-//int main(void)
-//{
-//	uint16_t temp;
-//	
-//	//设置中断优先级分组
-//	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);  
-//	
-//	//调试串口初始化
-//	AX_UART_DB_Init(115200); //调试串口
-//	printf("  \r\n"); //输出空格，CPUBUG
-//	
-//	//JTAG口设置
-//	AX_JTAG_Set(JTAG_SWD_DISABLE);  //关闭JTAG接口 
-//	AX_JTAG_Set(SWD_ENABLE);  //打开SWD接口 可以利用主板的SWD接口调试 		
-//	
-//	//软件延时初始化
-//	AX_DELAY_Init(); 	
-//    AX_LED_Init();  
-//	
-//	//初始化
-//	AX_MOTOR_Init(10);  //设置电机控制PWM频率为10K
-
-//	while (1) 
-//	{	
-//		//控制电机转动
-//		for(temp=0; temp<=2000; temp++)
-//		{
-//			AX_MOTOR_A_SetSpeed(temp); 
-//			AX_MOTOR_B_SetSpeed(temp); 
-//			AX_Delayms(5);
-//		}
-//		AX_MOTOR_A_SetSpeed(0); 
-//		AX_MOTOR_B_SetSpeed(0); 	
-//		AX_Delayms(1000);
-//		
-//		//控制电机反向转动
-//		for(temp=0; temp<=2000; temp++)
-//		{
-//			AX_MOTOR_A_SetSpeed(-temp); 
-//			AX_MOTOR_B_SetSpeed(-temp); 
-//			AX_Delayms(5);
-//		}
-//		AX_MOTOR_A_SetSpeed(0); 
-//		AX_MOTOR_B_SetSpeed(0);   
-//		AX_Delayms(1000);
-//	}
-//}	
-
 
 
 /******************************************************************************
@@ -268,77 +195,6 @@ int main(void)
 //		printf("*AB:%5d CD:%5d \r\n",
 //		AX_ENCODER_AB_GetCounter(),AX_ENCODER_CD_GetCounter());  
 //		AX_Delayms(300);
-//	}
-//}	
-
-
-
-///******************************************************************************
-//例程名称：舵机控制例程
-//例程说明：控制8路舵机30度、90度、150度间隔运动
-//操作说明：可在8路舵机接口中任意一路插入舵机，舵机即可循环30°、90°、150°运动，
-//         如果插入多路舵机，或舵机负载扭矩大，请注意电源供电能力
-//*******************************************************************************/
-//int main(void)
-//{
-//	//设置中断优先级分组
-//	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);  
-//	
-//	//调试串口初始化
-//	AX_UART_DB_Init(115200); //调试串口
-//	printf("  \r\n"); //输出空格，CPUBUG
-//	
-//	//JTAG口设置
-//	AX_JTAG_Set(JTAG_SWD_DISABLE);  //关闭JTAG接口 
-//	AX_JTAG_Set(SWD_ENABLE);  //打开SWD接口 可以利用主板的SWD接口调试 		
-//	
-//	//软件延时初始化
-//	AX_DELAY_Init();
-//  AX_LED_Init();
-//	
-//	//初始化
-//	AX_SERVO_AB_Init();
-//    AX_SERVO_CD_Init();
-//	AX_SERVO_EFGH_Init();
-
-//	
-//	//提示信息
-//	printf("八路舵机控制测试\r\n");
-
-//	while (1) 
-//	{		
-//		printf("*30度...... \r\n");		
-//		AX_SERVO_A_SetAngle(300);
-//		AX_SERVO_B_SetAngle(300);
-//		AX_SERVO_C_SetAngle(300);
-//		AX_SERVO_D_SetAngle(300);
-//		AX_SERVO_E_SetAngle(300);
-//		AX_SERVO_F_SetAngle(300);
-//		AX_SERVO_G_SetAngle(300);
-//		AX_SERVO_H_SetAngle(300);
-//		AX_Delayms(1000);
-//		
-//		printf("*90度...... \r\n");
-//		AX_SERVO_A_SetAngle(900);
-//		AX_SERVO_B_SetAngle(900);
-//		AX_SERVO_C_SetAngle(900);
-//		AX_SERVO_D_SetAngle(900);
-//		AX_SERVO_E_SetAngle(900);
-//		AX_SERVO_F_SetAngle(900);
-//		AX_SERVO_G_SetAngle(900);
-//		AX_SERVO_H_SetAngle(900);
-//		AX_Delayms(1000);
-//		
-//		printf("*150度...... \r\n");
-//		AX_SERVO_A_SetAngle(1500);
-//		AX_SERVO_B_SetAngle(1500);
-//		AX_SERVO_C_SetAngle(1500);
-//		AX_SERVO_D_SetAngle(1500);
-//		AX_SERVO_E_SetAngle(1500);
-//		AX_SERVO_F_SetAngle(1500);
-//		AX_SERVO_G_SetAngle(1500);
-//		AX_SERVO_H_SetAngle(1500);
-//		AX_Delayms(1000);
 //	}
 //}	
 
